@@ -145,3 +145,11 @@ sudo crontab -u www-data -e
 
 ## SSL 證書的部分
 待補，TBD
+
+## 資料部分單獨掛接
+1. 在 TureNAS 設定好 www-data 的使用者(33)以及群組(33)
+2. 在 TureNAS 開好 NFS 分享，並將權限設定為 www-data:www-data 770
+3. 在 nextcloud 中掛上剛剛分享出來的 NFS
+```
+sudo mount -o bg,soft,rsize=32768,wsize=32768 192.168.0.100:/mnt/OU_House/pve_Nc_data /var/www/nextcloud/data
+```
