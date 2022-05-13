@@ -175,3 +175,11 @@ opcache.interned_strings_buffer=16
 ```
 systemctl restart apache2
 ```
+
+## 檔案靠 scp 上傳後在網頁找不到
+- 使用 occ 重新掃描檔案
+```
+cd /var/www/nextcloud
+sudo -u www-data php --define apc.enable_cli=1 occ  # 全部操作介紹
+sudo -u www-data php --define apc.enable_cli=1 occ files:scan <user_id>
+```
