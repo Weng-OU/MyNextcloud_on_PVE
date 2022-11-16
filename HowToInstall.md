@@ -19,6 +19,7 @@ sudo apt update
 sudo apt install apache2 mariadb-server libapache2-mod-php7.4
 sudo apt install php7.4-gd php7.4-mysql php7.4-curl php7.4-mbstring php7.4-intl
 sudo apt install php7.4-gmp php7.4-bcmath php-imagick php7.4-xml php7.4-zip
+sudo apt install php-apcu
 ```
 
 ### 啟動 MySQL，並設定 root 使用者密碼並以 root 使用者登入
@@ -143,7 +144,7 @@ sudo crontab -u www-data -e
 ```
 
 ## SSL 證書的部分
-待補，TBD
+改成 pfsense 當路由後，直接開反向代理處理掉了
 
 ## 資料部分單獨掛接
 1. 在 TureNAS 設定好 www-data 的使用者(33)以及群組(33)
@@ -182,4 +183,80 @@ systemctl restart apache2
 cd /var/www/nextcloud
 sudo -u www-data php --define apc.enable_cli=1 occ  # 全部操作介紹
 sudo -u www-data php --define apc.enable_cli=1 occ files:scan <user_id>
+```
+
+## 解除 IP 被封鎖
+```
+cd /var/www/nextcloud
+sudo -u www-data php --define apc.enable_cli=1 occ security:bruteforce:reset [IP address]
+```
+或是
+```
+sudo vim /var/www/nextcloud/config/config.php
+
+'auth.bruteforce.protection.enabled' => false,
+```
+
+## 錯誤
+### 目前的 PHP 的記憶體限制設定低於建議值 512MB。
+- 修改 `vim /etc/php/8.1/apache2/php.ini`
+- 記得重啟 apache
+```
+# memory_limit = 128M
+memory_limit = 512M
+```
+
+### 反向代理改寫
+- 你經由安全的連線存取系統，但系統卻生成了不安全的 URL。這很有可能是因為你使用了反向代理伺服器，但反向代理伺服器的改寫規則並未正常工作，請閱讀關於此問題的文件頁面 ↗。
+- 依照文件，修改 `/var/www/nextcloud/config/config.php`
+    - 雖然寫了一堆，但其實只需要新增一個
+```
+'trusted_proxies'   => ['192.168.1.1'],     # 反向代理位址
+```
+
+## 新增另一種快取
+- 安裝 redis-server 和 php-redis
+```
+sudo apt install redis-server
+sudo apt install php-redis
+service apache2 restart
+```
+
+- 檢查是否正常啟動
+```
+ps ax | grep redis
+#   29569 ?        Ssl    0:00 /usr/bin/redis-server 127.0.0.1:6379
+```
+
+- 修改 `/var/www/nextcloud/config/config.php`
+    - 要跟 `/etc/redis/redis.conf` 搭配設定
+```
+'memcache.distributed' => '\OC\Memcache\Redis',
+'memcache.locking' => '\OC\Memcache\Redis',
+'redis' => [
+        'host'     => '127.0.0.1',
+        'port'     => 6379,
+],
+```
+
+- 將 redis 加入 www-data 群組
+```
+usermod -a -G redis www-data
+```
+
+- 重啟 apache
+```
+systemctl restart apache2
+```
+
+## PHP 加速
+- 修改 `/etc/php/8.1/apache2/php.ini`
+    - https://blog.scottchayaa.com/post/2019/01/13/php-opcache/
+```
+# 以下直接照著修改
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=10000
+opcache.validate_timestamps=0
 ```
